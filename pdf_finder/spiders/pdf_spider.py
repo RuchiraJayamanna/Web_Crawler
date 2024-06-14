@@ -26,6 +26,9 @@ class PdfSpider(CrawlSpider):
         self.search_writer.writerow(['page_url'])
 
         self.page_count = 0
+        self.pdf_count = 0
+        self.non_working_pdf_count = 0
+        self.search_result_count = 0
 
     rules = (
         Rule(LinkExtractor(), callback='parse_item', follow=True),
@@ -41,25 +44,29 @@ class PdfSpider(CrawlSpider):
             pdf_url = response.urljoin(pdf_link)
             self.pdf_writer.writerow([pdf_url, response.url])
             self.pdf_links_file.flush()
+            self.pdf_count += 1
 
             try:
                 r = requests.get(pdf_url, headers={'Range': 'bytes=0-1024'}, timeout=60)
                 if r.status_code != 206 and r.status_code != 200:
                     self.non_working_writer.writerow([r.status_code, pdf_url, response.url])
                     self.non_working_pdfs_file.flush()
+                    self.non_working_pdf_count += 1
             except requests.exceptions.RequestException as e:
                 self.non_working_writer.writerow([str(e), pdf_url, response.url])
                 self.non_working_pdfs_file.flush()
+                self.non_working_pdf_count += 1
 
         if self.search_text and self.search_text in page_text:
             self.search_writer.writerow([response.url])
             self.search_results_file.flush()
+            self.search_result_count += 1
 
     def closed(self, reason):
         self.pdf_links_file.close()
         self.non_working_pdfs_file.close()
         self.search_results_file.close()
         print(f'Total pages processed: {self.page_count}')
-        print(f'Total PDFs found: {self.pdf_links_file}')
-        print(f'Total non-working PDFs: {self.non_working_pdfs_file}')
-        print(f'Total search results: {self.search_results_file}')
+        print(f'Total PDFs found: {self.pdf_count}')
+        print(f'Total non-working PDFs: {self.non_working_pdf_count}')
+        print(f'Total search results: {self.search_result_count}')
